@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import mongoose from "mongoose";
 import app from "./app.js";
+import Deadline from "./models/Deadline.js";
 
 dotenv.config();
 
@@ -10,6 +11,8 @@ const PORT = Number(process.env.PORT) || 3000;
 async function startServer(): Promise<void> {
   try {
     await connectDB();
+    // Ensure the unique sparse clientID index exists before accepting requests.
+    await Deadline.init();
 
     const server = app.listen(PORT, () => {
       console.log(`Deadline API running on port ${PORT}`);

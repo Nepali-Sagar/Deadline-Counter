@@ -1,4 +1,3 @@
-
 import mongoose, { Schema, Document } from "mongoose";
 
 export const DEADLINE_CATEGORIES = [
@@ -8,11 +7,10 @@ export const DEADLINE_CATEGORIES = [
   "Health",
   "Other",
 ] as const;
-
-export type DeadlineCategory =
-  (typeof DEADLINE_CATEGORIES)[number];
+export type DeadlineCategory = (typeof DEADLINE_CATEGORIES)[number];
 
 export interface IDeadline extends Document {
+  clientID?: string;
   title: string;
   dueDate: Date;
   isUrgent: boolean;
@@ -24,6 +22,15 @@ export interface IDeadline extends Document {
 
 const deadlineSchema = new Schema<IDeadline>(
   {
+    // Stable client-generated identifier makes retried POST requests idempotent.
+    clientID: {
+      type: String,
+      trim: true,
+      minlength: 1,
+      maxlength: 100,
+      unique: true,
+      sparse: true,
+    },
     title: {
       type: String,
       required: [true, "Deadline title is required"],
@@ -35,7 +42,6 @@ const deadlineSchema = new Schema<IDeadline>(
         message: "Deadline title cannot contain only whitespace",
       },
     },
-
     dueDate: {
       type: Date,
       required: [true, "Due date is required"],
@@ -45,12 +51,7 @@ const deadlineSchema = new Schema<IDeadline>(
         message: "Due date must be a valid date",
       },
     },
-
-    isUrgent: {
-      type: Boolean,
-      default: false,
-    },
-
+    isUrgent: { type: Boolean, default: false },
     category: {
       type: String,
       enum: {
@@ -59,19 +60,9 @@ const deadlineSchema = new Schema<IDeadline>(
       },
       default: "Other",
     },
-
-    isCompleted: {
-      type: Boolean,
-      default: false,
-    },
+    isCompleted: { type: Boolean, default: false },
   },
-  {
-    timestamps: true,
-    versionKey: false,
-  }
+  { timestamps: true, versionKey: false },
 );
 
-export default mongoose.model<IDeadline>(
-  "Deadline",
-  deadlineSchema
-);
+export default mongoose.model<IDeadline>("Deadline", deadlineSchema);

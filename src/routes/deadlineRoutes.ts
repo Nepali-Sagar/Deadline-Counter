@@ -1,13 +1,11 @@
-
 import { Router, Request, Response } from "express";
 import mongoose from "mongoose";
-import Deadline, {
-  DEADLINE_CATEGORIES,
-} from "../models/Deadline.js";
+import Deadline, { DEADLINE_CATEGORIES } from "../models/Deadline.js";
 
 const router = Router();
 
 const ALLOWED_FIELDS = [
+  "clientID",
   "title",
   "dueDate",
   "isUrgent",
@@ -16,6 +14,7 @@ const ALLOWED_FIELDS = [
 ] as const;
 
 type DeadlineInput = {
+  clientID?: string;
   title?: string;
   dueDate?: string;
   isUrgent?: boolean;
@@ -24,16 +23,12 @@ type DeadlineInput = {
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  );
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validateInput(
   body: unknown,
-  isUpdate = false
+  isUpdate = false,
 ): { data?: DeadlineInput; error?: string } {
   if (!isObject(body)) {
     return { error: "Request body must be a JSON object" };
@@ -41,9 +36,11 @@ function validateInput(
 
   const keys = Object.keys(body);
 
-  if (keys.some((key) => !ALLOWED_FIELDS.includes(
-    key as (typeof ALLOWED_FIELDS)[number]
-  ))) {
+  if (
+    keys.some(
+      (key) => !ALLOWED_FIELDS.includes(key as (typeof ALLOWED_FIELDS)[number]),
+    )
+  ) {
     return { error: "Request contains unsupported fields" };
   }
 
@@ -53,11 +50,21 @@ function validateInput(
 
   const data: DeadlineInput = {};
 
-  if (!isUpdate || "title" in body) {
+  if ("clientID" in body) {
     if (
-      typeof body.title !== "string" ||
-      !body.title.trim()
+      typeof body.clientID !== "string" ||
+      !body.clientID.trim() ||
+      body.clientID.length > 100
     ) {
+      return {
+        error: "clientID must be a non-empty string of at most 100 characters",
+      };
+    }
+    data.clientID = body.clientID.trim();
+  }
+
+  if (!isUpdate || "title" in body) {
+    if (typeof body.title !== "string" || !body.title.trim()) {
       return { error: "A non-empty title is required" };
     }
 
@@ -93,9 +100,7 @@ function validateInput(
   if ("category" in body) {
     if (
       typeof body.category !== "string" ||
-      !(DEADLINE_CATEGORIES as readonly string[]).includes(
-        body.category
-      )
+      !(DEADLINE_CATEGORIES as readonly string[]).includes(body.category)
     ) {
       return { error: "Invalid deadline category" };
     }
@@ -117,8 +122,6 @@ function validateInput(
 
   return { data };
 }
-
-
 
 // GET /api/deadlines
 router.get("/", async (_req: Request, res: Response, next) => {
@@ -180,12 +183,27 @@ router.post("/", async (req: Request, res: Response, next) => {
   }
 
   try {
-    const deadline = await Deadline.create(validation.data);
+    const { clientID, ...fields } = validation.data;
 
-    res.status(201).json({
-      success: true,
-      data: deadline,
-    });
+    // Repeated POSTs with the same clientID return the same MongoDB record.
+    // This handles a server commit whose response was lost in transit.
+    let deadline;
+    if (clientID) {
+      deadline = await Deadline.findOneAndUpdate(
+        { clientID },
+        { $setOnInsert: { ...fields, clientID } },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
+          setDefaultsOnInsert: true,
+        },
+      );
+    } else {
+      deadline = await Deadline.create(fields);
+    }
+
+    res.status(201).json({ success: true, data: deadline });
   } catch (error) {
     if (error instanceof mongoose.Error.ValidationError) {
       res.status(400).json({
@@ -211,6 +229,13 @@ router.put("/:id", async (req: Request, res: Response, next) => {
     return;
   }
 
+  if (isObject(req.body) && "clientID" in req.body) {
+    res
+      .status(400)
+      .json({ success: false, message: "clientID cannot be changed" });
+    return;
+  }
+
   const validation = validateInput(req.body, true);
 
   if (validation.error || !validation.data) {
@@ -228,7 +253,7 @@ router.put("/:id", async (req: Request, res: Response, next) => {
       {
         returnDocument: "after",
         runValidators: true,
-      }
+      },
     );
 
     if (!deadline) {
