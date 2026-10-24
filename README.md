@@ -2,7 +2,10 @@
 
 The Deadline API is the backend service for the Deadline Counter app. It provides a JSON REST API for creating, viewing, updating, and deleting deadlines, and stores deadline data in MongoDB.
 
-This repository contains the API only. The macOS and iPhone apps are separate frontend clients that communicate with it over HTTP; their source code and platform-specific setup belong in their own repositories. Links to those repositories can be added here once they are available.
+This repository contains the API only. The macOS and iPhone apps are separate frontend clients that communicate with it over HTTP; their source code and platform-specific setup belong in their own repositories:
+
+- [macOS app (SwiftUI)](https://github.com/Nepali-Sagar/Frontend_DeadlineCountdown)
+- [iPhone app (SwiftUI)](https://github.com/Nepali-Sagar/Frontend_DeadlineCounterSwiftUI)
 
 ## Features
 
